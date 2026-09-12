@@ -1086,7 +1086,7 @@ mobileProductsLink.addEventListener('click', (e) => {
     mobileSolutionsLink.classList.remove('active');
 });
 
-// Desktop dropdown hover functionality - FIXED VERSION
+// Desktop dropdown hover functionality
 solutionsLink.addEventListener('mouseenter', () => {
     solutionsDropdown.classList.add('active');
     productsDropdown.classList.remove('active');
@@ -1161,7 +1161,7 @@ function validateEmail(email) {
 
 async function submitFormToFirestore(formData) {
     try {
-        const response = await fetch('/.netlify/functions/contactForm', {
+        const response = await fetch('/api/contactForm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
