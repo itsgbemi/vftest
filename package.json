@@ -1,0 +1,17 @@
+{
+  "name": "gbemisola-oyeniyi-site",
+  "version": "1.0.0",
+  "description": "Gbemisola Oyeniyi — digital solutions, website management & voice acting",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
