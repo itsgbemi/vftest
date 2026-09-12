@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const axios = require('axios');
+const nodemailer = require('nodemailer');
 
 if (!admin.apps.length) {
   try {
@@ -18,6 +19,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+/* ---------- Telegram ---------- */
 async function sendTelegramNotification(formData) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -34,13 +36,49 @@ async function sendTelegramNotification(formData) {
   }
 }
 
+/* ---------- Gmail (Nodemailer) ---------- */
+async function sendEmailNotification(formData) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD
+    }
+  });
+
+  const mailOptions = {
+    from: `"Website Contact Form" <${process.env.GMAIL_USER}>`,
+    to: process.env.GMAIL_TO || process.env.GMAIL_USER,
+    replyTo: formData.email,
+    subject: `New Contact Form Submission from ${formData.name}`,
+    text: `You received a new message from your website contact form.\n\nName: ${formData.name}\nEmail: ${formData.email}\nMessage:\n${formData.description}\n\nSubmitted: ${formData.timestamp}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+        <h2 style="color: #811318; margin-bottom: 20px;">New Contact Form Submission</h2>
+        <p style="margin: 8px 0;"><strong>Name:</strong> ${formData.name}</p>
+        <p style="margin: 8px 0;"><strong>Email:</strong> <a href="mailto:${formData.email}">${formData.email}</a></p>
+        <p style="margin: 8px 0;"><strong>Submitted:</strong> ${formData.timestamp}</p>
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+        <p style="margin: 8px 0;"><strong>Message:</strong></p>
+        <p style="white-space: pre-wrap; background: #f9f5f2; padding: 15px; border-radius: 8px;">${formData.description}</p>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Gmail notification sent successfully');
+  } catch (error) {
+    console.error('Gmail notification error:', error);
+  }
+}
+
+/* ---------- Handler ---------- */
 module.exports = async (req, res) => {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
@@ -59,6 +97,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // 1. Save to Firestore
     const docRef = await db.collection('contactSubmissions').add({
       ...data,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -66,7 +105,11 @@ module.exports = async (req, res) => {
       userAgent: req.headers['user-agent'] || null
     });
 
-    await sendTelegramNotification(data);
+    // 2. Fire off notifications in parallel (non-blocking failures)
+    await Promise.allSettled([
+      sendTelegramNotification(data),
+      sendEmailNotification(data)
+    ]);
 
     return res.status(200).json({
       success: true,
